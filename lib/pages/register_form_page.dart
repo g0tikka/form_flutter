@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:form_interaction/model/user.dart';
+import 'user_info_page.dart';
 
 class RegisterFormPage extends StatefulWidget {
   const RegisterFormPage({super.key});
@@ -39,6 +41,8 @@ class _RegisterFormPageState extends State<RegisterFormPage> {
   ];
 
   String? _selectedCountry;
+
+  User newUser = User();
 
   @override
   void dispose() {
@@ -108,14 +112,14 @@ class _RegisterFormPageState extends State<RegisterFormPage> {
                         )),
                   ),
                   validator: _validateName,
+                  onSaved: (newValue) => newUser.name = newValue!,
                 ),
                 SizedBox(
                   height: 10.0,
                 ),
                 TextFormField(
-                  //validator: _validateAge,
+                  validator: _validateAge,
                   controller: _ageController,
-
                   focusNode: _ageFocus,
                   autofocus: false,
                   onFieldSubmitted: (_) {
@@ -146,6 +150,7 @@ class _RegisterFormPageState extends State<RegisterFormPage> {
                 ),
                 TextFormField(
                   controller: _emailController,
+                  validator: _validateEmailAddress,
                   decoration: InputDecoration(
                     labelText: 'E-mail address *',
                     suffixIcon: IconButton(
@@ -170,6 +175,7 @@ class _RegisterFormPageState extends State<RegisterFormPage> {
                 ),
                 TextFormField(
                   controller: _storyController,
+                  validator: _validateStory,
                   decoration: InputDecoration(
                     labelText: 'Your story *',
                     suffixIcon: IconButton(
@@ -234,12 +240,7 @@ class _RegisterFormPageState extends State<RegisterFormPage> {
                   onFieldSubmitted: (_) {
                     fieldFocusChange(context, _phoneFocus, _passFocus);
                   },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please fill the blank with your phone number';
-                    }
-                    return null;
-                  },
+                  validator: _validatePhone,
                   controller: _phoneNumberController,
                   decoration: InputDecoration(
                     labelText: 'Phone number *',
@@ -268,9 +269,11 @@ class _RegisterFormPageState extends State<RegisterFormPage> {
                   height: 10.0,
                 ),
                 TextFormField(
-                  controller: _passController,
+                  validator: _validatePassword,
+                  controller: ObscuringTextEditingController(),
                   focusNode: _passFocus,
-                  obscureText: _passwordVisible,
+                  enableSuggestions: false,
+                  autocorrect: false,
                   maxLength: 16,
                   decoration: InputDecoration(
                     labelText: 'Password *',
@@ -295,6 +298,7 @@ class _RegisterFormPageState extends State<RegisterFormPage> {
                 ),
                 TextFormField(
                   controller: _passController,
+                  validator: _validatePassword,
                   maxLength: 16,
                   decoration: InputDecoration(
                     labelText: 'Confirm password *',
@@ -326,9 +330,13 @@ class _RegisterFormPageState extends State<RegisterFormPage> {
     );
   }
 
-  void _submitForm() {
+  void _submitForm() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
+
+      // UserCredential user = await FirebaseAuth.instance
+      //     .signInWithEmailAndPassword(
+      //         email: _emailController.text, password: _passController.text);
 
       _showDialog(_nameController.text);
       print('${_nameController.text}, your form has been submitted!');
@@ -357,11 +365,50 @@ class _RegisterFormPageState extends State<RegisterFormPage> {
     }
   }
 
-  //_validateAge
-  //_validateEmail
-  //_validateStory
-  //_validatePhoneNumber
-  //_validatePassword
+  String? _validateAge(String? value) {
+    if (value == null || int.tryParse(value) == false || value.isEmpty) {
+      return 'Wrong format. Please use numeric symbols.';
+    } else {
+      return null;
+    }
+  }
+
+  String? _validateEmailAddress(String? value) {
+    final _emailExp = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+
+    if (value == null || value.isEmpty) {
+      return 'Please fill the missing space.';
+    } else if (_emailExp.hasMatch(value)) {
+      return null;
+    }
+  }
+
+  String? _validateStory(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Wrong format. Please use alphabetic symbols.';
+    } else {
+      return null;
+    }
+  }
+
+  String? _validatePhone(String? value) {
+    final _phoneExp =
+        RegExp(r'^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$');
+
+    if (value == null || value.isEmpty) {
+      return 'Format: (XXX)-XXX-XXXX';
+    } else if (_phoneExp.hasMatch(value)) {
+      return null;
+    }
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Wrong format. Please use alphabetic symbols.';
+    } else {
+      return null;
+    }
+  }
 
   void _showDialog(String name) {
     showDialog(
@@ -369,7 +416,10 @@ class _RegisterFormPageState extends State<RegisterFormPage> {
         builder: (context) {
           return AlertDialog(
             title: Text('Registration successful'),
-            content: Text('$name is now a verified register form'),
+            content: Padding(
+              padding: EdgeInsets.only(left: 22.0),
+              child: Text('$name is now a verified user'),
+            ),
             actions: [
               TextButton(
                   onPressed: () {
@@ -380,9 +430,42 @@ class _RegisterFormPageState extends State<RegisterFormPage> {
           );
         });
   }
+}
 
-  // bool? _validatePhoneNumber(String input) {
-  //   final _phoneExp = RegExp(r'^(\d\d\d)-\d\d\d-\d\d\d\d$');
-  //  return _phoneExp.hasMatch(input);
-  // }
+class ObscuringTextEditingController extends TextEditingController {
+  bool isObscured = true;
+
+  void changeFieldVisibility({required bool isVisible}) {
+    isObscured = !isVisible;
+  }
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    required bool withComposing,
+    TextStyle? style,
+  }) {
+    final displayValue = isObscured
+        ? ('•' * (value.text.length - 1)) +
+            (value.text.characters.lastOrNull ?? '')
+        : value.text;
+    if (!value.composing.isValid || !withComposing) {
+      return TextSpan(style: style, text: displayValue);
+    }
+    final composingStyle = style?.merge(
+      const TextStyle(decoration: TextDecoration.underline),
+    );
+
+    return TextSpan(
+      style: style,
+      children: <TextSpan>[
+        TextSpan(text: value.composing.textBefore(displayValue)),
+        TextSpan(
+          style: composingStyle,
+          text: value.composing.textInside(displayValue),
+        ),
+        TextSpan(text: value.composing.textAfter(displayValue)),
+      ],
+    );
+  }
 }
